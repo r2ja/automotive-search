@@ -52,31 +52,78 @@ export default function Home() {
     setInput("");
     setLoading(true);
 
+    // Add empty assistant message that we'll stream into
+    const assistantMsgIndex = messages.length + 1;
+    setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+
     try {
       const resp = await fetch("/api/rag", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: userMessage.content, messages })
       });
-      const data = await resp.json();
 
-      // Use the server-provided assistant answer if present
-      const assistantResponse = data?.answer || getBotResponse(userMessage.content);
+      if (!resp.ok) {
+        throw new Error(`HTTP error! status: ${resp.status}`);
+      }
 
-      // Append assistant message into the chat UI
-      setMessages(prev => [...prev, { role: "assistant", content: assistantResponse }]);
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      // If API returned car rows, show them (these are hydrated from Supabase)
-      if (Array.isArray(data?.cars) && data.cars.length > 0) {
-        setCars(data.cars);
-        setShowCarCards(true);
-      } else {
-        // if none returned, optionally hide cards
-        setShowCarCards(false);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // Keep last incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith("data: ")) continue;
+
+          const data = line.slice(6); // Remove "data: " prefix
+          if (data === "[DONE]") continue;
+
+          try {
+            const parsed = JSON.parse(data);
+
+            if (parsed.text) {
+              // Stream text into the assistant message
+              setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[assistantMsgIndex] = {
+                  ...newMessages[assistantMsgIndex],
+                  content: newMessages[assistantMsgIndex].content + parsed.text
+                };
+                return newMessages;
+              });
+            }
+
+            if (parsed.cars) {
+              // Show car cards
+              setCars(parsed.cars);
+              setShowCarCards(true);
+            }
+
+            if (parsed.error) {
+              console.error("Stream error:", parsed.error);
+            }
+          } catch (e) {
+            console.error("Failed to parse SSE data:", e);
+          }
+        }
       }
     } catch (e) {
       console.error("RAG call failed:", e);
-      setMessages(prev => [...prev, { role: "assistant", content: "Sorry, something went wrong. Please try again." }]);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[assistantMsgIndex] = {
+          role: "assistant",
+          content: "Sorry, something went wrong. Please try again."
+        };
+        return newMessages;
+      });
     } finally {
       setLoading(false);
     }

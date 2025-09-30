@@ -3,40 +3,45 @@ import OpenAI from "openai";
 export async function generateOpenAIResponse(input, options = {}) {
   const {
     model = "gpt-4o-mini",
-    instructions = "You are a helpful automotive assistant.",
-    messages = []
+    systemMessage = "You are a helpful automotive assistant.",
+    messages = [],
+    stream = false
   } = options;
 
   try {
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    
+
     if (!OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY missing");
     }
 
-    console.log("[OpenAI] Input:", input);
-    console.log("[OpenAI] Messages:", messages);
-
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-    // Use the correct OpenAI Responses API format from the docs
-    const response = await openai.responses.create({
+    // Build messages array properly
+    const chatMessages = [
+      { role: "system", content: systemMessage },
+      ...messages
+    ];
+
+    console.log("[OpenAI] Chat messages:", JSON.stringify(chatMessages, null, 2));
+
+    // Use the correct Chat Completions API
+    const response = await openai.chat.completions.create({
       model: model,
-      instructions: instructions,
-      input: messages.length > 0 ? messages : input
+      messages: chatMessages,
+      stream: stream,
+      temperature: 0.7,
     });
 
-    console.log("[OpenAI] Raw response:", JSON.stringify(response, null, 2));
+    // If streaming, return the stream directly
+    if (stream) {
+      return response;
+    }
 
-    // Extract text from the response
-    const outputText = response.output_text || 
-      (response.output && Array.isArray(response.output) 
-        ? response.output
-            .map(item => item?.content?.map(c => c.type === "output_text" ? c.text : "").join(""))
-            .join("")
-        : "");
+    // Extract text from non-streaming response
+    const outputText = response.choices?.[0]?.message?.content || "";
 
-    console.log("[OpenAI] Extracted text:", outputText);
+    console.log("[OpenAI] Response text:", outputText.substring(0, 200));
 
     return {
       success: true,
