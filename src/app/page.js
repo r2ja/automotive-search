@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Header from "@/components/Header";
 import CarCard from "@/components/CarCard";
+import CarModal from "@/components/CarModal";
 import Message from "@/components/Message";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { carRecommendations, conversationFlows, botResponses } from "@/data/mockData";
@@ -15,6 +16,8 @@ export default function Home() {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const [cars, setCars] = useState([]);
+  const [selectedCar, setSelectedCar] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     scrollToBottom();
@@ -179,10 +182,17 @@ export default function Home() {
             <div className="mt-6 space-y-4">
               <div className="text-sm text-gray-300 mb-2">Recommended cars:</div>
               {cars.map((car) => (
-                <CarCard key={car.Car_ID || car.id} car={car} />
+                <CarCard
+                  key={car.Car_ID || car.id}
+                  car={car}
+                  onClick={() => {
+                    setSelectedCar(car);
+                    setIsModalOpen(true);
+                  }}
+                />
               ))}
               <div className="mt-4">
-                <Message message={"Want more details about any of these? Click a card or ask for specifics."} isUser={false} />
+                <Message message={"Click any car to see full details!"} isUser={false} />
               </div>
             </div>
           )}
@@ -191,6 +201,13 @@ export default function Home() {
 
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Car Details Modal */}
+        <CarModal
+          car={selectedCar}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+        />
 
         <div className="relative">
           <textarea

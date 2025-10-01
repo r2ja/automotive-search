@@ -2,11 +2,14 @@
 "use client";
 import { useState } from "react";
 
-export default function CarCard({ car }) {
+export default function CarCard({ car, onClick }) {
   const [imageError, setImageError] = useState(false);
 
   return (
-    <div className="bg-[#2a2a35] rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 hover:bg-[#323240] transition-colors">
+    <div
+      className="bg-[#2a2a35] rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 hover:bg-[#323240] transition-colors cursor-pointer"
+      onClick={onClick}
+    >
       <div className="w-full sm:w-32 h-32 sm:h-24 bg-white rounded-lg flex-shrink-0 overflow-hidden relative">
         {car?.imageUrl && !imageError ? (
           <img
